@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.8  C:\Users\Mario\Documents\GitHub\Progra_de_micro\Ejemplo1\Ejemplo1\main.asm Fri Jan 24 18:40:41 2025
+AVRASM ver. 2.2.8  C:\Users\Mario\Documents\GitHub\Progra_de_micro\Ejemplo1\Ejemplo1\main.asm Fri Jan 24 18:59:53 2025
 
 
 EQU  SIGNATURE_000 0000001e
@@ -695,4 +695,4 @@ EQU  ACIaddr      0000002e
 EQU  TWIaddr      00000030
 EQU  SPMRaddr     00000032
 EQU  INT_VECTORS_SIZE 00000034
-CSEG start        00000000
+CSEG START        00000002

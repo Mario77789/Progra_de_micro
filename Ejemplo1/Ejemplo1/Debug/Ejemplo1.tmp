@@ -22,6 +22,6 @@
   <FILE>Ejemplo1.lss</FILE>
  </OUTPUT_FILES>
  <LABELS>
-  <start><FILE>C:\Users\Mario\Documents\GitHub\Progra_de_micro\Ejemplo1\Ejemplo1\main.asm</FILE><LINE>10</LINE></start>
+  <START><FILE>C:\Users\Mario\Documents\GitHub\Progra_de_micro\Ejemplo1\Ejemplo1\main.asm</FILE><LINE>11</LINE></START>
  </LABELS>
 </ASSEMBLER_INFO>

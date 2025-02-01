@@ -1,2 +1,2 @@
-*.vs*
-*\Debug*
+**/bs
+**/Debug
