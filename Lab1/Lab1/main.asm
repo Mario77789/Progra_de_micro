@@ -1,187 +1,160 @@
-;************************************************************  
+;***********************************************************  
 ; Universidad del Valle de Guatemala  
 ; IE2023: Programación de Microcontroladores  
-; ContadorBinarioDobleMod.asm  
+; ContadorBinario.asm  
 ;  
-; Author  : Mario Fernando Cano Itzep  
-; Proyecto: Contador Binario Dual + Suma + Antirrebote  
-; Hardware: ATmega328P  
-; Creado  : 04/02/2025  
-;************************************************************  
+; Created: 11/02/25
+; Author : Mario Fernando Cano Itzep
+; Descripción: Contador Binario Dual con anti-rebote y suma de 4 bits
+;***********************************************************  
 
-.INCLUDE "M328PDEF.inc"  
+.INCLUDE "M328PDEF.INC"
 
-.cseg  
-.org 0x0000  
+.CSEG
+.ORG 0x0000
 
-;-----------------------------------------------------------  
-; Configuración de pila  
-RESET:  
-    LDI     R16, LOW(RAMEND)   ; Inicializa la pila  
-    OUT     SPL, R16  
-    LDI     R16, HIGH(RAMEND)  
-    OUT     SPH, R16  
+; Configuración de la pila
+    LDI     R16, LOW(RAMEND)
+    OUT     SPL, R16
+    LDI     R16, HIGH(RAMEND)
+    OUT     SPH, R16
 
-;-----------------------------------------------------------  
-; Configuración inicial del MCU  
-SETPU:  
-    ; Configurar Puerto D como entrada con pull-ups (botones)  
-    LDI     R16, 0x00          ; Entradas para botones en PORTD  
-    OUT     DDRD, R16  
-    LDI     R16, 0xFF          ; Activa pull-ups en todas las entradas  
-    OUT     PORTD, R16  
+; Configuración de puertos
+SETUP:
+    ; Puerto D como salida (LEDs C1 y C2)
+    LDI     R16, 0xFF
+    OUT     DDRD, R16
 
-    ; Configurar Puerto B como salida (Contador 1 LEDs)  
-    LDI     R16, 0xFF  
-    OUT     DDRB, R16  
+    ; Puerto B como salida (Resultado + Overflow)
+    LDI     R16, 0x1F        ; PB0-PB4 como salidas
+    OUT     DDRB, R16
 
-    ; Configurar Puerto C como salida (Contador 2 LEDs y suma/resultado)  
-    LDI     R16, 0xFF  
-    OUT     DDRC, R16  
+    ; Puerto C como entrada con pull-ups (Botones)
+    LDI     R16, 0x00
+    OUT     DDRC, R16
+    LDI     R16, 0x1F        ; Pull-ups en PC0-PC4
+    OUT     PORTC, R16
 
-    ; Inicializar contadores en 0  
-    CLR     R18                ; Contador 1 (R18)  
-    CLR     R19                ; Contador 2 (R19)  
+    ; Inicializar contadores
+    CLR     R17               ; Contador 1
+    CLR     R18               ; Contador 2
 
-    RJMP    MAIN  
+; Bucle principal
+LOOP:
+    ; Leer botones Contador 1
+    SBIS    PINC, 0           ; Incrementar C1
+    RCALL   BOTON_INC_C1
+    SBIS    PINC, 1           ; Decrementar C1
+    RCALL   BOTON_DEC_C1
 
-;-----------------------------------------------------------  
-; Bucle principal  
-MAIN:  
-    RCALL   CONTADOR_1         ; Manejar Contador 1  
-    RCALL   CONTADOR_2         ; Manejar Contador 2  
-    RCALL   Boton_Suma        ; Verificar el botón para sumar  
-    OUT     PORTB, R18         ; Mostrar Contador 1 en LEDs  
-    OUT     PORTC, R19         ; Mostrar Contador 2 en LEDs  
-    RJMP    MAIN  
+    ; Leer botones Contador 2
+    SBIS    PINC, 2           ; Incrementar C2
+    RCALL   BOTON_INC_C2
+    SBIS    PINC, 3           ; Decrementar C2
+    RCALL   BOTON_DEC_C2
 
-;-----------------------------------------------------------  
-; Subrutina para manejar el Contador 1  
-CONTADOR_1:  
-    RCALL   LEER_BOTONES_C1    ; Verifica los botones del Contador 1  
-    RET  
+    ; Leer botón de suma
+    SBIS    PINC, 4
+    RCALL   MOSTRAR_SUMA
 
-; Subrutina para manejar el Contador 2  
-CONTADOR_2:  
-    RCALL   LEER_BOTONES_C2    ; Verifica los botones del Contador 2  
-    RET  
+    ; Actualizar LEDs
+    RCALL   ACTUALIZAR_DISPLAY
+    RJMP    LOOP
 
-;-----------------------------------------------------------  
-; Subrutina para leer botones del Contador 1  
-LEER_BOTONES_C1:  
-    ; Incrementar Contador 1 (PD2)  
-    SBIS    PIND, 2  
-    RCALL   INC_CONTADOR1  
+; Subrutinas de manejo de botones
+BOTON_INC_C1:
+    RCALL   ANTIRREBOTE
+    SBIS    PINC, 0
+    RET
+    RCALL   INCREMENTAR_C1
+    RET
 
-    ; Decrementar Contador 1 (PD3)  
-    SBIS    PIND, 3  
-    RCALL   DEC_CONTADOR1  
+BOTON_DEC_C1:
+    RCALL   ANTIRREBOTE
+    SBIS    PINC, 1
+    RET
+    RCALL   DECREMENTAR_C1
+    RET
 
-    RET  
+BOTON_INC_C2:
+    RCALL   ANTIRREBOTE
+    SBIS    PINC, 2
+    RET
+    RCALL   INCREMENTAR_C2
+    RET
 
-; Subrutina para leer botones del Contador 2  
-LEER_BOTONES_C2:  
-    ; Incrementar Contador 2 (PD4)  
-    SBIS    PIND, 4  
-    RCALL   INC_CONTADOR2  
+BOTON_DEC_C2:
+    RCALL   ANTIRREBOTE
+    SBIS    PINC, 3
+    RET
+    RCALL   DECREMENTAR_C2
+    RET
 
-    ; Decrementar Contador 2 (PD5)  
-    SBIS    PIND, 5  
-    RCALL   DEC_CONTADOR2  
+; Subrutinas de contadores
+INCREMENTAR_C1:
+    INC     R17
+    ANDI    R17, 0x0F         ; Limitar a 4 bits
+    RET
 
-    RET  
+DECREMENTAR_C1:
+    CPI     R17, 0x00
+    BREQ    DEC_C1_OVER
+    DEC     R17
+    RET
+DEC_C1_OVER:
+    LDI     R17, 0x0F
+    RET
 
-;-----------------------------------------------------------  
-; Subrutinas para incrementar y decrementar Contador 1  
-INC_CONTADOR1:  
-    RCALL   ANTIRREBOTE        ; Llama al antirrebote para el botón  
-    SBIC    PIND, 2            ; Verifica si el botón sigue presionado  
-    RET  
-    INC     R18                ; Incrementa el contador 1  
-    ANDI    R18, 0x0F          ; Limita a 4 bits  
-    RET  
+INCREMENTAR_C2:
+    INC     R18
+    ANDI    R18, 0x0F         ; Limitar a 4 bits
+    RET
 
-DEC_CONTADOR1:  
-    RCALL   ANTIRREBOTE        ; Llama al antirrebote  
-    SBIC    PIND, 3            ; Verifica si el botón sigue presionado  
-    RET  
-    CPI     R18, 0x00          ; ¿El contador está en 0?  
-    BRNE    DEC1               ; Si no, decrementa  
-    LDI     R18, 0x0F          ; Si está en 0, envuélvelo a 15  
-    RET  
-DEC1:  
-    DEC     R18                ; Decrementa el contador  
-    ANDI    R18, 0x0F          ; Limita a 4 bits  
-    RET  
+DECREMENTAR_C2:
+    CPI     R18, 0x00
+    BREQ    DEC_C2_OVER
+    DEC     R18
+    RET
+DEC_C2_OVER:
+    LDI     R18, 0x0F
+    RET
 
-;-----------------------------------------------------------  
-; Subrutinas para incrementar y decrementar Contador 2  
-INC_CONTADOR2:  
-    RCALL   ANTIRREBOTE        ; Llama al antirrebote para el botón  
-    SBIC    PIND, 4            ; Verifica si el botón sigue presionado  
-    RET  
-    INC     R19                ; Incrementa el contador 2  
-    ANDI    R19, 0x0F          ; Limita a 4 bits  
-    RET  
+; Subrutina de visualización
+ACTUALIZAR_DISPLAY:
+    MOV     R16, R17          ; Cargar C1
+    SWAP    R18               ; Preparar C2
+    OR      R16, R18          ; Combinar ambos contadores
+    OUT     PORTD, R16        ; Actualizar LEDs
+    SWAP    R18               ; Restaurar C2
+    RET
 
-DEC_CONTADOR2:  
-    RCALL   ANTIRREBOTE        ; Llama al antirrebote  
-    SBIC    PIND, 5            ; Verifica si el botón sigue presionado  
-    RET  
-    CPI     R19, 0x00          ; ¿El contador está en 0?  
-    BRNE    DEC2               ; Si no, decrementa  
-    LDI     R19, 0x0F          ; Si está en 0, envuélvelo a 15  
-    RET  
-DEC2:  
-    DEC     R19                ; Decrementa el contador  
-    ANDI    R19, 0x0F          ; Limita a 4 bits  
-    RET  
+; Subrutina de suma
+MOSTRAR_SUMA:
+    RCALL   ANTIRREBOTE
+    SBIS    PINC, 4
+    RET
+    
+    MOV     R19, R17          ; Cargar C1
+    ADD     R19, R18          ; Sumar C2
+    MOV     R16, R19
+    
+    ; Manejar overflow
+    ANDI    R16, 0x1F         ; Máscara para 5 bits
+    CPI     R19, 0x10
+    BRLO    NO_OVERFLOW
+    ORI     R16, 0x10         ; Activar bit de overflow
+NO_OVERFLOW:
+    OUT     PORTB, R16        ; Mostrar resultado
+    RET
 
-;-----------------------------------------------------------  
-; Subrutina para verificar el botón de suma  
-Boton_Suma:  
-    SBIS    PIND, 6            ; Saltar si el botón PD6 no está presionado  
-    RET                        ; Retornar si no está presionado  
-
-    RCALL   ANTIRREBOTE        ; Llama al antirrebote  
-    RCALL   SUMAR              ; Llama a la subrutina de suma  
-
-WAIT_SUMAR:  
-    SBIS    PIND, 6            ; Verifica si el botón se suelta  
-    RJMP    WAIT_SUMAR  
-    RET  
-
-; Subrutina para sumar los contadores  
-SUMAR:  
-    CLR     R20                ; Registro temporal para la suma  
-    ADD     R20, R18           ; Suma el valor de R18  
-    ADD     R20, R19           ; Suma el valor de R19  
-    CPI     R20, 0x10          ; Verifica si hay acarreo (>= 16)  
-    BRLO    NO_CARRY           ; Si no hay acarreo, saltar  
-    SBI     PORTB, 7           ; Activa el bit PB7 para indicar acarreo  
-    RJMP    Limite_Suma         ; Salta a actualizar la suma  
-
-NO_CARRY:  
-    CBI     PORTB, 7           ; Apaga el bit PB7 si no hay acarreo  
-
-Limite_Suma:  
-    ANDI    R20, 0x0F          ; Limita la suma a 4 bits  
-    OUT     PORTC, R20         ; Muestra el resultado de la suma en PORTC  
-    RET  
-
-;-----------------------------------------------------------  
-; Subrutina de antirrebote  
-ANTIRREBOTE:  
-    LDI     R20, 210           ; Retardo estimado de 20 ms  
-B1:  
-    LDI     R21, 255  
-B2:  
-    LDI     R22, 50  
-B3:  
-    DEC     R22  
-    BRNE    B3  
-    DEC     R21  
-    BRNE    B2  
-    DEC     R20  
-    BRNE    B1  
+; Subrutina anti-rebote (20ms @ 1MHz)
+ANTIRREBOTE:
+    LDI     R19, 27
+DELAY1:
+    LDI     R20, 250
+DELAY2:
+    DEC     R20
+    BRNE    DELAY2
+    DEC     R19
+    BRNE    DELAY1
     RET
