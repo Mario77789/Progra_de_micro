@@ -1551,47 +1551,87 @@ DEC_ALARM_MIN_NOT_ZERO_D:
     RET  
 
 ; Verificar si la hora actual coincide con la hora de la alarma  
-VERIFICAR_ALARMA:  
-    PUSH temp  
-    PUSH temp2  
-
-    ; Verificar si la alarma ya está activa  
-    LDS temp, alarm_active  
-    CPI temp, 1  
-    BREQ FIN_VERIFICAR_ALARMA ; Si ya está activa, no hacer nada más  
-
+VERIFICAR_ALARMA:   
+    PUSH temp   
+    PUSH temp2   
+   
+    ; Verificar si la alarma ya está activa   
+    LDS temp, alarm_active   
+    CPI temp, 1   
+    BREQ FIN_VERIFICAR_ALARMA ; Si ya está activa, no hacer nada más   
+    
+    ; NUEVO: Verificar bit de alarma apagada manualmente  
+    SBRC flags, 1  ; Saltar siguiente instrucción si bit 1 está borrado  
+    RJMP COMPROBAR_CAMBIO_HORA  ; Si alarma fue apagada, verificar si cambió la hora  
+   
+CONTINUAR_VERIFICACION:  
+    ; Comparar horas   
+    LDS temp, cont_hr_d   
+    LDS temp2, alarm_hr_d   
+    CP temp, temp2   
+    BRNE FIN_VERIFICAR_ALARMA ; Si decenas de hora no coinciden, salir   
+   
+    LDS temp, cont_hr_u   
+    LDS temp2, alarm_hr_u   
+    CP temp, temp2   
+    BRNE FIN_VERIFICAR_ALARMA ; Si unidades de hora no coinciden, salir   
+   
+    ; Comparar minutos   
+    LDS temp, cont_min_d   
+    LDS temp2, alarm_min_d   
+    CP temp, temp2   
+    BRNE FIN_VERIFICAR_ALARMA ; Si decenas de minutos no coinciden, salir  
+    
+    LDS temp, cont_min_u   
+    LDS temp2, alarm_min_u   
+    CP temp, temp2   
+    BRNE FIN_VERIFICAR_ALARMA ; Si unidades de minutos no coinciden, salir   
+   
+    ; Si todo coincide, activar la alarma   
+    LDI temp, 1   
+    STS alarm_active, temp   
+    LDI temp, 0   
+    STS alarm_counter, temp   
+    SBI PORTB, PB5 ; Encender LED de alarma (PB5)   
+    RJMP FIN_VERIFICAR_ALARMA  
+    
+COMPROBAR_CAMBIO_HORA:  
+    ; Verificar si la hora actual ya no coincide con la hora de alarma  
+    ; para limpiar el bit de alarma apagada manualmente  
+    
     ; Comparar horas  
     LDS temp, cont_hr_d  
     LDS temp2, alarm_hr_d  
     CP temp, temp2  
-    BRNE FIN_VERIFICAR_ALARMA ; Si decenas de hora no coinciden, salir  
-
+    BRNE RESET_ALARM_FLAG  
+    
     LDS temp, cont_hr_u  
     LDS temp2, alarm_hr_u  
     CP temp, temp2  
-    BRNE FIN_VERIFICAR_ALARMA ; Si unidades de hora no coinciden, salir  
-
+    BRNE RESET_ALARM_FLAG  
+    
     ; Comparar minutos  
     LDS temp, cont_min_d  
     LDS temp2, alarm_min_d  
     CP temp, temp2  
-    BRNE FIN_VERIFICAR_ALARMA ; Si decenas de minutos no coinciden, salir  
-
+    BRNE RESET_ALARM_FLAG  
+    
     LDS temp, cont_min_u  
     LDS temp2, alarm_min_u  
     CP temp, temp2  
-    BRNE FIN_VERIFICAR_ALARMA ; Si unidades de minutos no coinciden, salir  
-
-    ; Si todo coincide, activar la alarma  
-    LDI temp, 1  
-    STS alarm_active, temp  
-    LDI temp, 0  
-    STS alarm_counter, temp  
-    SBI PORTB, PB5 ; Encender LED de alarma (PB5)  
-
-FIN_VERIFICAR_ALARMA:  
-    POP temp2  
-    POP temp  
+    BRNE RESET_ALARM_FLAG  
+    
+    ; Si todavía coincide la hora, mantener bit y salir  
+    RJMP FIN_VERIFICAR_ALARMA  
+    
+RESET_ALARM_FLAG:  
+    ; La hora ya no coincide, resetear bit de alarma apagada  
+    ANDI flags, ~(1<<1)  ; Limpiar bit 1  
+    RJMP CONTINUAR_VERIFICACION  ; Ahora sí verificar la alarma  
+   
+FIN_VERIFICAR_ALARMA:   
+    POP temp2   
+    POP temp   
     RET  
     
 ; FUNCIÓN CORREGIDA: Manejo del temporizador con incrementos no deseados corregidos    
@@ -1724,20 +1764,41 @@ CHECK_PB1_PRESS:
     CALL BOTON_MINUTOS    
     RJMP FIN_PCINT0     
       
-CHECK_PB2_PRESS:     
-    ; Verificar botón PB2 (decrementar)     
-    SBIC PINB, PB2   
-    RJMP CHECK_PB3_PRESS    
+CHECK_PB2_PRESS:      
+    ; Verificar botón PB2 (decrementar)      
+    SBIC PINB, PB2    
+    RJMP CHECK_PB3_PRESS  
+
+    ; NUEVA FUNCIONALIDAD: Verificar si estamos en modo hora (MODO=0) y la alarma está activa  
+    CPI modo, 0  
+    BRNE CHECK_MODO_CONFIG  ; Si no estamos en modo hora, verificar el modo configuración  
+    
+    ; Estamos en modo hora, verificar si la alarma está activa  
+    LDS temp, alarm_active  
+    CPI temp, 1  
+    BRNE CHECK_MODO_CONFIG  ; Si la alarma no está activa, verificar el modo configuración  
+    
+    ; La alarma está activa y estamos en modo hora, apagar la alarma  
+    LDI temp, 0  
+    STS alarm_active, temp  
+    STS alarm_counter, temp  
+    CBI PORTB, PB5  ; Apagar LED de alarma  
+    
+    ; Establecer bit 1 de flags para indicar alarma apagada manualmente  
+    ORI flags, (1<<1)  ; Establecer bit 1  
+    
+    RJMP FIN_PCINT0  
       
-    ; Acción según modo (decrementar)    
-    CPI modo, 2    
-    BRLO FIN_PCINT0  ; Si modo < 2, ignorar    
-      
-    ; En modo configuración, manejar botones a través de las funciones específicas    
-    CALL BOTON_HORAS    
-    CALL BOTON_MINUTOS    
-    RJMP FIN_PCINT0    
-      
+CHECK_MODO_CONFIG:  
+    ; Acción según modo (decrementar)     
+    CPI modo, 2  
+    BRLO FIN_PCINT0  ; Si modo < 2, ignorar     
+       
+    ; En modo configuración, manejar botones a través de las funciones específicas     
+    CALL BOTON_HORAS     
+    CALL BOTON_MINUTOS     
+    RJMP FIN_PCINT0
+
 CHECK_PB3_PRESS:    
     ; Verificar botón PB3 (cambiar selección)    
     SBIC PINB, PB3    
