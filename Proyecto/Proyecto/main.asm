@@ -3,8 +3,8 @@
 ; IE2023: Programación de Microcontroladores      
 ;      
 ; Reloj Digital con 4 displays (horas:minutos)      
-; Multiplexación en PC0-PC3 (cambiado de PB0-PB3)      
-; Botones en PB0-PB3 (cambiado de PC0-PC2)      
+; Multiplexación en PC0-PC3 ( de PB0-PB3)      
+; Botones en PB0-PB3 ( PC0-PC2)      
 ; LEDs indicadores en PB4, PC4, PC5 y PB5 (alarma)      
 ;************************************************************      
 .include "m328Pdef.inc"      ; Incluye definiciones para ATmega328P  
