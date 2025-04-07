@@ -69,9 +69,9 @@ void setup()
     
     // Configurar Timer0  
     TCCR0A = 0x00;  
-    TCCR0B = (1 << CS02) | (1 << CS00); //  
+    TCCR0B = (1 << CS02) | (1 << CS00); 
     TCNT0 = 100;   
-    TIMSK0 = (1 << TOIE0); //
+    TIMSK0 = (1 << TOIE0); 
     
     // Configurar interrupciones para botones (PCINT)  
     PCICR = (1 << PCIE1);       
@@ -80,7 +80,7 @@ void setup()
     counter_10ms = 0;  
     update_leds(); // Inicializar LEDs con el valor actual  
     
-    sei(); // Habilitar interrupciones globales  
+    sei(); 
 }  
 
 
