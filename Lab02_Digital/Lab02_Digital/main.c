@@ -55,8 +55,8 @@ void setup(void)
 
 void mostrarVoltajes(void)
 {
-	uint16_t adc1 = ADC_Read(2); // A7
-	uint16_t adc2 = ADC_Read(5); // A6
+	uint16_t adc1 = ADC_Read(2); 
+	uint16_t adc2 = ADC_Read(5); 
 
 	float v1 = adc1 * 5.0 / 1023.0;
 	float v2 = adc2 * 5.0 / 1023.0;

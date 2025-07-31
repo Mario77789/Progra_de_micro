@@ -9,8 +9,8 @@
 
 #include <avr/io.h>
 
-#define LCD_RS PC0  // RS ? TX1
-#define LCD_E  PC1  // E  ? RX1
+#define LCD_RS PC0  // 
+#define LCD_E  PC1  //
 
 void LCD_Init(void);
 void LCD_Command(uint8_t cmd);
