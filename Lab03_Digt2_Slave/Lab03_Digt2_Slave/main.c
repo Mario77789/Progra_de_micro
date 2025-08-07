@@ -25,9 +25,9 @@ ISR(SPI_STC_vect) {
 
 	if (estado == 0 && (recibido == 'A' || recibido == 'B')) {
 		if (recibido == 'A')
-		respuesta = ADC_Read(0) >> 2;
+		respuesta = ADC_Read(7) >> 2;
 		else
-		respuesta = ADC_Read(1) >> 2;
+		respuesta = ADC_Read(6) >> 2;
 
 		SPDR = respuesta;
 		estado = 1;

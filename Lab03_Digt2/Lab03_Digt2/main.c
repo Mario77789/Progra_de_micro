@@ -14,7 +14,7 @@
 #include "UART/UART.h"
 #include "SPI/SPI.h"
 
-uint8_t modo = 'L';
+uint8_t modo = 'R';
 
 void mostrarEnLEDs(uint8_t valor) {
 	PORTD = (PORTD & 0b00000011) | (valor << 2);  // D2–D7
@@ -42,8 +42,8 @@ int main(void) {
 		if (UART_available()) {
 			char c = UART_receiveChar();
 
-			if (c == 'L' || c == 'l') {
-				modo = 'L';
+			if (c == 'R' || c == 'r') {
+				modo = 'R';
 				UART_sendString("Modo Lectura Activado\r\n");
 				limpiarBufferUART();
 				continue;
@@ -84,7 +84,7 @@ int main(void) {
 			}
 		}
 
-		if (modo == 'L') {
+		if (modo == 'R') {
 			PORTB &= ~(1 << PB2);
 			SPI_Exchange('A');           // Comando para leer potenciómetro 1
 			_delay_us(100);
