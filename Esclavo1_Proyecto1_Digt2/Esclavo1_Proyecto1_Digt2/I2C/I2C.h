@@ -1,10 +1,12 @@
 /*
  * I2C.h
  *
- * Created: 10/08/2025 17:37:57
+ * Created: 16/08/2025 20:13:29
  *  Author: mario
  */ 
 
+#ifndef I2C_H
+#define I2C_H
 
 #include <avr/io.h>
 #include <util/twi.h>
@@ -26,3 +28,5 @@ uint8_t I2C_ReadNACK(void);
 void    I2C_SlaveInit(uint8_t address);
 uint8_t I2C_SlaveReceive(void);
 void    I2C_SlaveTransmit(uint8_t data);
+
+#endif
