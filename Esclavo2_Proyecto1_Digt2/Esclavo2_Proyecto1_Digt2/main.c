@@ -1,8 +1,8 @@
 /*
  * Esclavo2_Proyecto1_Digt2.c
  *
- * Created: 12/08/2025 01:05:09
- * Author : mario
+ * Created: 10/08/2025 19:04:59
+ *  Author: mario
  */ 
 
 #define F_CPU 16000000UL
@@ -17,6 +17,9 @@
 #define MOTOR_PIN     PB1        
 
 #define CMD_PREPARE   0x01
+#define CMD_FORCE_TEMP 0x11
+#define CMD_MODE_AUTO  0x12
+
 #define STATUS_OK     0x00
 #define STATUS_BUSY   0xFE
 #define STATUS_INIT   0xFF
@@ -30,6 +33,16 @@ volatile uint8_t data_len    = 2;
 
 volatile uint8_t request_measure = 0;  // pedido desde ISR
 volatile uint8_t ready            = 0;  // dato listo (OK o error)
+
+// NUEVO: control forzado
+volatile uint8_t force_mode = 0; // 0=AUTO, 1=FORCE
+volatile uint8_t force_val  = 0; // 0=OFF, 1=ON
+
+// recepción de par comando+dato
+volatile uint8_t i2c_expect_data = 0;
+volatile uint8_t i2c_last_cmd    = 0;
+volatile uint8_t i2c_data_byte   = 0;
+volatile uint8_t i2c_have_pair   = 0;
 
 static inline void set_led(uint8_t state) {
     DDRB |= (1 << STATUS_LED);
@@ -83,33 +96,52 @@ static int8_t read_dht11(void) {
     return (int8_t) data[2]; // °C entero
 }
 
+// ISR TWI
 ISR(TWI_vect) {
     uint8_t st = TWSR & 0xF8;
 
     switch (st) {
         case 0x60:  // own SLA+W
-        case 0x68:  // arbitration lost; own SLA+W
-        case 0x70:  // general call (no usado)
-        case 0x78:  // arb lost; general call
+        case 0x68:
+        case 0x70:
+        case 0x78:
             TWCR = (1<<TWEN)|(1<<TWIE)|(1<<TWINT)|(1<<TWEA);
             break;
 
         case 0x80:  // data received; ACK
-        case 0x90:  // data after general call; ACK
-        {
-            uint8_t cmd = TWDR;
-            if (cmd == CMD_PREPARE) {
-                ready = 0;
-                status_code = STATUS_BUSY;
-                tx_buf[0] = STATUS_BUSY;
-                tx_buf[1] = (uint8_t)temperature; // último conocido
-                request_measure = 1;               // el loop hará la lectura
+        case 0x90: {
+            uint8_t byte = TWDR;
+
+            if (!i2c_expect_data){
+                // primer byte = comando
+                i2c_last_cmd = byte;
+
+                if (byte == CMD_PREPARE){
+                    ready = 0;
+                    status_code = STATUS_BUSY;
+                    tx_buf[0] = STATUS_BUSY;
+                    tx_buf[1] = (uint8_t)temperature; // último conocido
+                    request_measure = 1;
+                }
+                else if (byte == CMD_FORCE_TEMP){
+                    i2c_expect_data = 1;   // espera el valor 0/1
+                }
+                else if (byte == CMD_MODE_AUTO){
+                    force_mode = 0;        // vuelve a automático
+                }
+                // otros: ignorar
+            } else {
+                // segundo byte = dato del comando previo
+                i2c_data_byte  = byte;
+                i2c_have_pair  = 1;
+                i2c_expect_data= 0;
             }
+
             TWCR = (1<<TWEN)|(1<<TWIE)|(1<<TWINT)|(1<<TWEA);
         } break;
 
         case 0xA8:  // own SLA+R
-        case 0xB0:  // arbitration lost; own SLA+R
+        case 0xB0:
             tx_idx = 0;
             if (ready) {
                 tx_buf[0] = status_code;          // 0 si OK, >0 si error
@@ -122,14 +154,14 @@ ISR(TWI_vect) {
             TWCR = (1<<TWEN)|(1<<TWIE)|(1<<TWINT)|(1<<TWEA);
             break;
 
-        case 0xB8:  // data transmitted; ACK
+        case 0xB8:  // Data transmitted; ACK
             if (tx_idx < data_len) {
                 TWDR = tx_buf[tx_idx++];
             }
             TWCR = (1<<TWEN)|(1<<TWIE)|(1<<TWINT)|(1<<TWEA);
             break;
 
-        case 0xC0:  // data transmitted; NACK
+        case 0xC0:  // Data transmitted; NACK
         case 0xC8:  // last data transmitted; ACK
             TWCR = (1<<TWEN)|(1<<TWIE)|(1<<TWINT)|(1<<TWEA);
             break;
@@ -145,14 +177,24 @@ int main(void) {
     DDRB  |= (1 << MOTOR_PIN);
     PORTB &= ~(1 << MOTOR_PIN); // apagado al inicio
 
-    // Setup original
     set_led(0);
 
-    I2C_SlaveInit(SLAVE_ADDRESS);   // deja esta llamada como la tienes
-    TWCR = (1<<TWEN)|(1<<TWEA)|(1<<TWIE)|(1<<TWINT); // habilita TWIE
+    I2C_SlaveInit(SLAVE_ADDRESS);
+    TWCR = (1<<TWEN)|(1<<TWEA)|(1<<TWIE)|(1<<TWINT);
     sei();
 
     while (1) {
+        // ¿Llegó un par comando+dato?
+        if (i2c_have_pair){
+            if (i2c_last_cmd == CMD_FORCE_TEMP){
+                force_mode = 1;
+                force_val  = (i2c_data_byte ? 1 : 0);
+                if (force_val) PORTB |=  (1 << MOTOR_PIN);
+                else           PORTB &= ~(1 << MOTOR_PIN);
+            }
+            i2c_have_pair = 0;
+        }
+
         if (request_measure) {
             int8_t result = read_dht11();
 
@@ -163,16 +205,21 @@ int main(void) {
 
                 set_led(1); _delay_ms(50); set_led(0);
 
-                // Motor ON si temperatura == 29 °C, OFF en otro caso
-                if (temperature >= 27) PORTB |=  (1 << MOTOR_PIN);
-                else                    PORTB &= ~(1 << MOTOR_PIN);
+                // Control motor:
+                if (force_mode){
+                    if (force_val) PORTB |=  (1 << MOTOR_PIN);
+                    else           PORTB &= ~(1 << MOTOR_PIN);
+                } else {
+                    // AUTO: temp >= 27 -> ON
+                    if (temperature >= 27) PORTB |=  (1 << MOTOR_PIN);
+                    else                    PORTB &= ~(1 << MOTOR_PIN);
+                }
 
                 tx_buf[0] = STATUS_OK;
                 tx_buf[1] = (uint8_t)temperature;
             } else {
-                status_code = (uint8_t)(-result);  // 1..4 típicos
+                status_code = (uint8_t)(-result);
                 ready = 1;
-                // Sin cambios adicionales de lógica: motor conserva su último estado
                 tx_buf[0] = status_code;
                 tx_buf[1] = (uint8_t)temperature;
                 blink_pattern(status_code);
@@ -182,6 +229,5 @@ int main(void) {
             _delay_ms(1000); // DHT11: mínimo 1 s entre lecturas
         }
     }
-
     return 0;
 }

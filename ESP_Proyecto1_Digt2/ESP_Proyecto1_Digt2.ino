@@ -9,9 +9,9 @@
 
 // ====== CREDENCIALES ======
 #define AIO_USER   "Mario_Cano"
-#define AIO_KEY    "aio_qfMH82CrBHiRZfcP1jwA6MoBoywB"
-#define WIFI_SSID  "Familia_CB"
-#define WIFI_PASS  "336B5hxFvo"
+#define AIO_KEY    "aio_Zisr55QjPA8pec5PxEW6vcJ7czy0"
+#define WIFI_SSID  "S23"
+#define WIFI_PASS  "12345678"
 // ==========================
 
 // Feeds

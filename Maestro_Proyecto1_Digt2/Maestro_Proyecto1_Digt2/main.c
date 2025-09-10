@@ -1,7 +1,9 @@
 /*
- * Maestro_Proyecto1_Digt2.c  — UI fija S1/S2/S3 + Servo en D10 + UART a ESP32
- * UART (cada 4 s): "cm,lux,temp\n"
- */
+ * Maestro_Proyecto1_Digt2.c
+ *
+ * Created: 10/08/2025 19:04:59
+ *  Author: mario
+ */ 
 
 #define F_CPU 16000000UL
 #include <avr/io.h>
